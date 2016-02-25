@@ -1,0 +1,3 @@
+from PdbSublimeTextSupport import preloop, precmd
+pdb.Pdb.preloop = preloop
+pdb.Pdb.precmd = precmd
