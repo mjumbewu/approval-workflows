@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'approval',
+    'kibali',
 ]
 
 MIDDLEWARE_CLASSES = [
@@ -70,6 +70,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'approval.wsgi.application'
+CELERY_APP = 'approval.celery.app'
 
 
 # Database

@@ -51,9 +51,9 @@ def cleanuprepo(repopath):
 class GitRepo:
     VALID_ROOTS = ['/tmp']
 
-    def __init__(self, upstream, path=None):
-        self.upstream = upstream
-        self.path = path
+    def __init__(self, path=None, remotes=None):
+        self.remotes = remotes
+        self.path = path or tempfile.mkdtemp()
         self.temp_path = (path == None)
 
         # Make sure the path starts with some valid root
@@ -63,36 +63,35 @@ class GitRepo:
                 .format(', '.join(self.VALID_ROOTS)))
 
     def __enter__(self):
-        if self.path is None:
-            self.path = tempfile.mkdtemp()
+        return self
 
     def __exit__(self):
-        shutil.rmtree(self.path)
-
-    @classmethod
-    def clone(cls, upstream, path=None):
-        repo = cls(upstream, path=path)
-        run("""
-            cd {path}
-            git clone {upstream}
-            """.format(path=path,
-                       upstream=upstream))
-        return repo
+        if self.temp_path:
+            self.destroy()
 
     def runcmd(self, cmd, *args, **kwargs):
         cmdargs = [cmd]
 
         def flagify(key):
+            """
+            Convert a key (such as a keyword argument) into a command line
+            flag. For example:
+            * "m" becomes "-m"
+            * "message" becomes "--message"
+            """
             return ('-' + key) if len(key) == 1 else ('--' + key)
 
         def quote(val):
+            """
+            Escape internal quotes in a string and return a new quoted string.
+            """
             return '"' + value.replace('"', '\\"') + '"'
 
+        cmdargs.extend(args)
         cmdargs.extend(chain.from_iterables(
             [flagify(key), quote(val)]
             for key, val in kwargs.items()
         ))
-        cmdargs.extend(args)
 
         p = run("""
                 cd {path}
@@ -101,11 +100,29 @@ class GitRepo:
                            cmdstr=' '.join(cmdargs)))
         return p.stdout
 
+    @classmethod
+    def init(cls, path):
+        repo = cls(path=path)
+        repo.runcmd('init', '.')
+        return repo
+
+    @classmethod
+    def clone(cls, upstream, path):
+        repo = cls(path=path, remotes={'origin': upstream})
+        repo.runcmd('clone', upstream, '.')
+        return repo
+
     def add(self, name):
-        return self.runcmd('add', name)
+        self.runcmd('add', name)
 
     def commit(self, message=''):
-        return self.runcmd('commit', m=message)
+        self.runcmd('commit', m=message)
 
     def push(self, remote='origin', branch='master'):
-        return self.runcmd('push', remote, branch)
+        self.runcmd('push', remote, branch)
+
+    def create(self):
+        run("mkdir -p {path}".format(path=self.path))
+
+    def destroy(self):
+        run("rm -rf {path}".format(path=self.path))

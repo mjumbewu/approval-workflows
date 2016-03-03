@@ -27,7 +27,7 @@ class Package (models.Model):
     # workflow = models.ForeignKey('Workflow')
     # current_state = models.ForeignKey('State')
     # content = models.BinaryField()  # The tarred git repository
-    repo = models.URLField()
+    repo = models.URLField(null=True, blank=True)
 
     def sign(self, signing_actor, signing_datetime=None, ):
         if signing_datetime is None:
