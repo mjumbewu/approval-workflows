@@ -1,0 +1,31 @@
+{% extends 'kibali/base.html' %}
+
+{% block content %}
+
+<table>
+  <thead>
+    <tr>
+      <td>Attribute Name</td>
+      <td>Attribute Value</td>
+    </tr>
+  </thead>
+  <tbody>
+    {% for key, val in data.items %}
+    <tr>
+      <td>{{ key }}</td>
+      <td>{{ val }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<hr>
+
+Look good? Sign.
+<form method="POST">{% csrf_token %}
+  <input name="name" placeholder="Your full name...">
+  <label><input name="binding" type="checkbox"> I agree to yada yada mumbo jumbo.</label>
+  <button>Sign</button>
+</form>
+
+{% endblock %}

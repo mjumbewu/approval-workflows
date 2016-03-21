@@ -1,6 +1,4 @@
 from celery import shared_task
-from gitutils import GitRepo
-from shutil import copytree
 from kibali.models import Package
 
 from logging import getLogger

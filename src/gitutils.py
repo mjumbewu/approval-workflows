@@ -2,12 +2,24 @@ import subprocess
 import tempfile
 import io
 import shutil
+from itertools import chain
+from os.path import join as pathjoin
+
+from logging import getLogger
+logger = getLogger(__name__)
 
 
 def run(cmd, **run_kwargs):
+    logger.debug(' -- Command: ' + cmd)
+
     run_kwargs.setdefault('shell', True)
     run_kwargs.setdefault('stdout', subprocess.PIPE)
-    return subprocess.run(cmd, **run_kwargs)
+    run_kwargs.setdefault('check', True)
+
+    proc = subprocess.run(cmd, **run_kwargs)
+
+    logger.debug(' -- Output: ' + proc.stdout.decode())
+    return proc
 
 # Make a bare git repo
 def mkrepo(repopath):
@@ -65,7 +77,7 @@ class GitRepo:
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, type, value, tb):
         if self.temp_path:
             self.destroy()
 
@@ -85,12 +97,12 @@ class GitRepo:
             """
             Escape internal quotes in a string and return a new quoted string.
             """
-            return '"' + value.replace('"', '\\"') + '"'
+            return '"' + val.replace('"', '\\"') + '"'
 
         cmdargs.extend(args)
-        cmdargs.extend(chain.from_iterables(
-            [flagify(key), quote(val)]
-            for key, val in kwargs.items()
+        cmdargs.extend(chain.from_iterable(
+            [flagify(key)] if val is True else [flagify(key), quote(val)]
+            for key, val in kwargs.items() if val is not False
         ))
 
         p = run("""
@@ -98,28 +110,51 @@ class GitRepo:
                 git {cmdstr}
                 """.format(path=self.path,
                            cmdstr=' '.join(cmdargs)))
-        return p.stdout
+        return p
+
+    def __ensure(self, valname, val):
+        """
+        Make sure that value is a string and is not empty.
+        """
+        val = str(val)
+        if len(val) < 1:
+            raise ValueError(valname + ' must not be empty.')
+        return val
 
     @classmethod
-    def init(cls, path):
+    def init(cls, path=None, bare=False):
         repo = cls(path=path)
-        repo.runcmd('init', '.')
+        repo.runcmd('init', '.', bare=bare)
         return repo
 
     @classmethod
-    def clone(cls, upstream, path):
+    def clone(cls, upstream, path=None):
         repo = cls(path=path, remotes={'origin': upstream})
         repo.runcmd('clone', upstream, '.')
+        logger.debug('Cloned to {}'.format(repo.path))
         return repo
 
-    def add(self, name):
-        self.runcmd('add', name)
+    def add(self, path):
+        path = self.__ensure('Path', path)
+        self.runcmd('add', path)
 
-    def commit(self, message=''):
+    def add_remote(self, remote, url):
+        remote = self.__ensure('Remote name', remote)
+        url = self.__ensure('Remote URL', url)
+        self.runcmd('remote', 'add', remote, url)
+
+    def commit(self, message):
+        message = self.__ensure('Commit message', message)
         self.runcmd('commit', m=message)
 
-    def push(self, remote='origin', branch='master'):
-        self.runcmd('push', remote, branch)
+    def tag(self, tagname, message, sign=False, key=False):
+        message = self.__ensure('Tag message', message)
+        self.runcmd('tag', tagname, m=message, s=sign, u=key)
+
+    def push(self, remote='origin', branch='master', tags=False):
+        remote = self.__ensure('Remote name', remote)
+        branch = self.__ensure('Branch name', branch)
+        self.runcmd('push', remote, branch, tags=tags)
 
     def create(self):
         run("mkdir -p {path}".format(path=self.path))

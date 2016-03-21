@@ -36,6 +36,10 @@ class Workflow (models.Model):
     """
     name = models.TextField()
     slug = models.SlugField()
+    on_start_callback_url = models.URLField(null=True, blank=True, help_text=_("The URL to which the package data will be forwarded when the state is entered."))
+    on_finish_callback_url = models.URLField(null=True, blank=True, help_text=_("The URL to which the package data will be forwarded when the state is left."))
+    on_start_redirect_url = models.URLField(null=True, blank=True, help_text=_("The page to which the user will be redirected when the state is entered, if by form POST and neither the previous state or transition had a redirect URL. If this is left blank, a default page will be used."))
+    on_finish_redirect_url = models.URLField(null=True, blank=True, help_text=_("The page to which the user will be redirected when the state is left, if by form POST. If this is left blank, the system will try to use the redirect URL from the transition or the enter condition of the next state. Otherwise, a default page will be used."))
 
     def __str__(self):
         return self.name
@@ -95,6 +99,10 @@ class State (models.Model):
     assignment = models.ForeignKey('Actor', null=True)
     actions = ArrayField(models.TextField(), null=True)
     workflow = models.ForeignKey('Workflow', related_name='states', on_delete=models.CASCADE)
+    on_enter_callback_url = models.URLField(null=True, blank=True, help_text=_("The URL to which the package data will be forwarded when the state is entered."))
+    on_leave_callback_url = models.URLField(null=True, blank=True, help_text=_("The URL to which the package data will be forwarded when the state is left."))
+    on_enter_redirect_url = models.URLField(null=True, blank=True, help_text=_("The page to which the user will be redirected when the state is entered, if by form POST and neither the previous state or transition had a redirect URL. If this is left blank, a default page will be used."))
+    on_leave_redirect_url = models.URLField(null=True, blank=True, help_text=_("The page to which the user will be redirected when the state is left, if by form POST. If this is left blank, the system will try to use the redirect URL from the transition or the enter condition of the next state. Otherwise, a default page will be used."))
 
     def __str__(self):
         return '{} in {}'.format(self.name, self.workflow.name)
@@ -130,6 +138,10 @@ class Transition (models.Model):
     condition = models.TextField(default='True')
     from_state = models.ForeignKey('State', related_name='transitions', on_delete=models.CASCADE)
     to_state = models.ForeignKey('State', related_name='reverse_transitions')
+    on_follow_callback_url = models.URLField(null=True, blank=True, help_text=_("The URL to which the package data will be forwarded when the state is entered."))
+    on_leave_callback_url = models.URLField(null=True, blank=True, help_text=_("The URL to which the package data will be forwarded when the state is left."))
+    on_follow_redirect_url = models.URLField(null=True, blank=True, help_text=_("The page to which the user will be redirected when the state is entered, if by form POST and neither the previous state or transition had a redirect URL. If this is left blank, a default page will be used."))
+    on_leave_redirect_url = models.URLField(null=True, blank=True, help_text=_("The page to which the user will be redirected when the state is left, if by form POST. If this is left blank, the system will try to use the redirect URL from the transition or the enter condition of the next state. Otherwise, a default page will be used."))
 
     class Meta:
         order_with_respect_to = 'from_state'
@@ -146,18 +158,21 @@ class Transition (models.Model):
         return data
 
 
-class Actor (models.Model):
+class Role (models.Model):
     """
     Part of the workflow template structure. See `Workflow` for more.
 
-    An actor may have a public key (or several) associated with them.
+    A role describes the actor or set of actors that may take an action at a
+    particular state in a workflow.
 
     Attributes:
     ----------
     * name
     """
-    name = models.TextField()
     workflow = models.ForeignKey('Workflow', related_name='actors')
+    name = models.TextField()
+    users = models.ManyToManyField(settings.AUTH_USER_MODEL, null=True, blank=True)
+    emails = models.TextField(default='', blank=True)
 
     def __str__(self):
         return '{} in {}'.format(self.name, self.workflow.name)

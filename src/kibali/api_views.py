@@ -1,8 +1,12 @@
+import json
+from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework.statuses import HTTP_202_ACCEPTED
-from os.path import join as pathjoin
-from kibali.models import Package
+from rest_framework.status import HTTP_202_ACCEPTED, HTTP_403_FORBIDDEN
+from kibali.models import Package, SignatureConfiguration
 from kibali.tasks import (
     create_package as create_package_task
 )
@@ -10,8 +14,8 @@ from kibali.tasks import (
 from logging import getLogger
 logger = getLogger(__name__)
 
-@api_view()
-def create_package(request):
+@api_view(['POST'])
+def create_package(request, signature_config_key):
 
     # TODO: At what point should the data be encrypted? Options:
     #   * Encrypt each file in the repository with something like git-crypt
@@ -48,22 +52,47 @@ def create_package(request):
     # code aren't stored in the same place (Heroku?).
     #
     # Also, the data should probably be encrypted before it even goes into the
-    # task queue.
+    # task queue. EEESH!!
 
+    # =========================================================================
+
+    # Get the signature configuration record for this request.
+    config = get_object_or_404(SignatureConfiguration, application_key=signature_config_key)
+
+    host = request.get_host()
+    if not config.is_host_allowed(host):
+        return Response({
+                'reason': 'Host {} is not allowed.'.format(host)
+            }, status=HTTP_403_FORBIDDEN)
+
+    # Load the data from the request.
     data = request.data
-    package = Package.objects.create()
-    task = create_package_task.delay(package.pk, data)
-    logger.debug(('Received request to create a new package. Package has '
-                  'ID {!r}').format(package.pk))
 
-    # Return a 202 response, since there's still processing going on.
+    # Create a new package.
+    package = Package.objects.create_for_signature(config)
+    logger.debug('Received request to create a new package. Package has ID {!r}'.format(package.pk))
+
+    # Encode/encrypt the data for storage in the new package.
+    encoded_data = json.dumps(data, sort_keys=True, indent=1)
+    task = create_package_task.delay(package.pk, encoded_data)
+
+    # If this content was submitted from a form, then assume that we
+    # should redirect to the page that the configuration specifies.
+    #
+    # TODO: Have a default success page if no redirect_url is
+    #       supplied.
+    if 'form' in request.content_type:
+        return HttpResponseRedirect(redirect_to=config.created_redirect_url)
+
+    # Otherwise, return a 202 response, since there's still processing
+    # going on in the background.
     return Response({
-        'package': package.pk,
-        'task': task.id,
-    }, status_code=HTTP_202_ACCEPTED)
+            'package': package.pk,
+            'task': task.id,
+        }, status=HTTP_202_ACCEPTED)
 
 
-@api_view()
+@api_view(['GET'])
 def task_status(request, task_id):
     """
     Report the status of the task identified by the given task_id.
