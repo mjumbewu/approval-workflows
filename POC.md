@@ -7,7 +7,7 @@ The user can:
 
 - Receive an email with a link to sign
 
-- Go to a page an click sign
+- Go to a page and click sign
   - Git repository commit created
   - Does not have to be GPG-backed
 
