@@ -1,5 +1,5 @@
-Approvio
---------
+Workflow Approvals
+------------------
 
 - Each workflow state has a unique random salt
 - Approvals/signatures are salted and hashed for verification
@@ -28,7 +28,7 @@ A workflow template is structured something like this:
           "then": [                                          // "then"/"transitions"
             {
               "goto": "Done",                                // "goto"/"next_state"
-              "when": "Applicant chooses to sign"            // "when"/"condition"
+              "when": "'{{action}}' == 'sign'"               // "when"/"condition"
             },
             {
               "goto": "Awaiting Preparer Signature"
@@ -55,11 +55,6 @@ A workflow template is structured something like this:
     }
 
 
-- /workflow/:slug/step
-  `{ data: ..., state: ... }`
-
-- /workflow/:slug/node/:id/
-  CRUD
 
 Examples of actors:
 - Applicant
@@ -68,26 +63,16 @@ Examples of actors:
 - Travel Committee (a list of people that manage the same queue; any one of them can be a signer)
 - CTO
 
-API should, by default, refuse (with a 403) to update a workflow template that is in use, as doing so *may* break any ongoing processes. You can provide a `x-approvio-force` header to force the issue.
 
 ----------
 
-Genius notion from @themightychris: Packages could be backed by a Git repository.
+Genius notion from @themightychris: Package could be backed by a Git repository.
+Data could be committed to repo, and signature/approval/action could be a tag.
+Commits and tags would be signed with GPG key to prevent tampering. For uber-
+secutiry, certain workflows could require tags to be signed with personal GPG
+key for extra verifiability.
 
-Installing Git LFS:
-
-```bash
-curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
-sudo apt-get install git-lfs
-git lfs install
-```
-
-Then, for each repo:
-
-```bash
-git init
-git lfs track "*.psd"
-```
+Documents have to be checked in to repo too.
 
 ----------
 
